@@ -1,0 +1,8 @@
+/*/node_modules
+/*/.idea
+/*/dist
+/*/yarn.lock
+/*/*.iml
+/publishing-ui/node_modules/
+/publishing-ui/.env
+/publishing-ui/.env.production

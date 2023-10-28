@@ -1,0 +1,53 @@
+{
+  "name": "lists-ui-vite",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@apollo/client": "^3.8.3",
+    "@emotion/react": "^11.11.1",
+    "@mantine/core": "^6.0.21",
+    "@mantine/dropzone": "^6.0.21",
+    "@mantine/form": "^6.0.21",
+    "@mantine/hooks": "^6.0.21",
+    "@mantine/modals": "^6.0.21",
+    "@mantine/notifications": "^6.0.21",
+    "@mantine/prism": "^6.0.21",
+    "@mantine/spotlight": "^6.0.21",
+    "@mapbox/geojson-extent": "^1.0.1",
+    "@tabler/icons": "^2.33.0",
+    "@tabler/icons-react": "^2.34.0",
+    "@types/geojson": "^7946.0.11",
+    "@types/mapbox-gl": "^2.7.14",
+    "apexcharts": "^3.44.0",
+    "axios": "^1.6.1",
+    "graphql": "^16.8.0",
+    "mapbox-gl": "^2.15.0",
+    "oidc-client-ts": "^2.2.5",
+    "react": "^18.2.0",
+    "react-apexcharts": "^1.4.1",
+    "react-dom": "^18.2.0",
+    "react-intl": "^6.4.4",
+    "react-oidc-context": "^2.3.0",
+    "react-router-dom": "^6.15.0",
+    "wkt": "^0.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vitejs/plugin-react": "^4.0.3",
+    "eslint": "^8.45.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.3",
+    "typescript": "^5.0.2",
+    "vite": "^4.4.5"
+  }
+}

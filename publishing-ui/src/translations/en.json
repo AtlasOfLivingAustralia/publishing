@@ -1,0 +1,22 @@
+{
+  "INVALID_ARCHIVE": "Darwin core archive is invalid",
+  "INVALID_ARCHIVE.description": "The structure of the Darwin Core archive is invalid. Please check the structure of the archive and try again.",
+  "BADLY_FORMED_META_XML": "The meta.xml file is badly formed",
+  "BADLY_FORMED_META_XML.description": "Please check the structure of the meta.xml file, ensuring it is valid XML and conforms to the Darwin Core Archive standard.",
+  "S3_ERROR": "System error when uploading archive",
+  "S3_ERROR.description": "There is a problem with storing the archive on temporary storage.",
+  "BADLY_FORMED_COORDINATES": "Invalid coordinates in the core data file",
+  "BADLY_FORMED_COORDINATES.description": "Please check the coordinates in the core data file, are valid numbers.",
+  "MISSING_OCCURRENCE_ID_VALUES": "Missing occurrenceID values",
+  "MISSING_OCCURRENCE_ID_VALUES.description": "Some of the occurrence records are missing an occurrenceID value",
+  "MISSING_OCCURRENCE_ID": "No occurrenceID field supplied",
+  "MISSING_OCCURRENCE_ID.description": "The occurrenceID field is missing from the core data file. Please ensure it is present in all rows with unique values within this dataset.",
+  "MISSING_EVENT_ID": "No eventID field supplied",
+  "MISSING_EVENT_ID.description": "Some of the event records are missing an eventID value",
+  "DUPLICATE_EVENT_ID_VALUES": "Duplicate eventID values",
+  "DUPLICATE_EVENT_ID_VALUES.description": "The eventID field does not have unique values for all rows.",
+  "MISSING_EVENT_ID_VALUES": "Missing eventID values",
+  "MISSING_EVENT_ID_VALUES.description": "The eventID field is missing from some rows. Please ensure it is present in all rows with unique values within this dataset.",
+  "UNSUPPORTED_CORE_TYPE": "Unsupported core type",
+  "UNSUPPORTED_CORE_TYPE.description": "The core type specified in the meta.xml is currently unsupported. Only the Occurrence and Event core types are supported at this time."
+}
