@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import publish_validated, validate, status, events, licences, publish, unpublish
+from routers import publish_validated, validate, status, events, licences, publish, unpublish, response_codes
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
@@ -34,6 +34,8 @@ app.include_router(unpublish.router)
 app.include_router(status.router)
 app.include_router(events.router)
 app.include_router(licences.router)
+app.include_router(response_codes.router)
+
 
 # Enable CORS
 app.add_middleware(

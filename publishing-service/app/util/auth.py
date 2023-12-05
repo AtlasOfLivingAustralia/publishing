@@ -1,6 +1,6 @@
 import logging
 import jwt
-from fastapi import Request, HTTPException, Depends
+from fastapi import Request, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 

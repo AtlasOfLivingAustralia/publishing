@@ -47,7 +47,7 @@ async def un_publish(dataResourceUid: str,
             return ErrorResponse(error=ErrorCode.NOT_AUTHORIZED_FOR_DATA_RESOURCE,
                                  message='You are not authorised to update this resource')
 
-        endpoint = f'{config.airflow_api_base_url}/dags/Delete_dataset_dag/dagRuns'
+        endpoint = f'{config.airflow_api_base_url}/dags/{config.delete_dag}/dagRuns'
         headers = {
             'Content-Type': 'application/json'
         }
@@ -63,9 +63,9 @@ async def un_publish(dataResourceUid: str,
                 "userDisplayName": user.name,
                 "dataset_name": data_resource['name'],
                 "datasetIds": dataResourceUid,
-                "remove_records_in_solr": "true",
-                "remove_records_in_es": "false",
-                "delete_avro_files": "true",
+                "remove_records_in_solr": f"{config.remove_records_in_solr}",
+                "remove_records_in_es": f"{config.remove_records_in_es}",
+                "delete_avro_files": f"{config.delete_avro_files}",
                 "retain_dwca": "true",
                 "retain_uuid": "true"
             }

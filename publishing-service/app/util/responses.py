@@ -1,16 +1,10 @@
 from dataclasses import dataclass
-from typing import Dict, Union, Optional, Annotated
+from typing import Dict, Union
 
-from fastapi import File, UploadFile, Form
-from pydantic import BaseModel, ConfigDict, GetJsonSchemaHandler
-from dwc_validator.model import DFValidationReport
-from pydantic.json_schema import JsonSchemaValue
+from fastapi import File, UploadFile
+from pydantic import BaseModel, ConfigDict
 
 from util.error_codes import ErrorCode
-
-
-class ValidationRequest(BaseModel):
-    file: Annotated[UploadFile, File(description="A file read as UploadFile")]
 
 
 class ProcessRequest(BaseModel):
@@ -59,7 +53,7 @@ class ValidationResponse(BaseModel):
     metadata: Dict = {}
     hasEml: bool = False
     coreValidation: Union[any, None]
-    extensionValidations: Union[list[any], None]
+    extensionValidations: Union[any, None]
     mapImage: Union[str, None]
 
 
