@@ -197,7 +197,7 @@ export default function Publish() {
             appendIfDefined("qualityControlDescription", datasetUpload.qualityControlDescription);
             appendIfDefined("licenceUrl", datasetUpload.licenceUrl);
 
-            fetch(import.meta.env.VITE_APP_PUBLISH_URL + "/publish", {
+            fetch(import.meta.env.VITE_APP_PUBLISH_URL + "/validate/publish", {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${token}` },
                 body: formData
@@ -265,6 +265,8 @@ export default function Publish() {
         setUploading(true);
 
         const formData = new FormData();
+        // @ts-ignore
+        formData.append("storeTemp", 'true');
         formData.append("file", files[0]);
         const oidcStorage = localStorage.getItem(`oidc.user:${import.meta.env.VITE_OIDC_AUTH_SERVER}:${import.meta.env.VITE_OIDC_CLIENT_ID}`);
 

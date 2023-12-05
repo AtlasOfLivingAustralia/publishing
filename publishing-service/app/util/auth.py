@@ -1,7 +1,7 @@
 import logging
-from typing import Union
 import jwt
-from fastapi import Request
+from fastapi import Request, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 
 class User:
@@ -13,18 +13,23 @@ class User:
         self.is_publisher = is_publisher
 
 
-def check_auth(request: Request) -> Union[None, User]:
+def get_user(request: Request) -> User:
     """
     Check the request for a valid JWT token
     :param request:
     :return:
     """
+    auth_header = request.headers.get("Authorization")
 
-    authorisation_header = request.headers.get('Authorization')
-    if not authorisation_header:
-        return None
+    if not auth_header:
+        credentials_exception = HTTPException(
+            status_code=401,
+            detail="Could not validate credentials",
+            headers={"Authorization": "Bearer"},
+        )
+        raise credentials_exception
     try:
-        jwt_token = authorisation_header.split(' ')[1]
+        jwt_token = auth_header.split(' ')[1]
         decoded_token = jwt.decode(jwt=jwt_token,
                                    verify=False,
                                    algorithms=None,
@@ -40,4 +45,42 @@ def check_auth(request: Request) -> Union[None, User]:
         return User(userid, user_email, user_display_name, is_admin, is_publisher)
     except Exception as e:
         logging.error("Authentication error", exc_info=True)
-        return None
+        credentials_exception = HTTPException(
+            status_code=401,
+            detail="Could not validate credentials",
+            headers={"Authorization": "Bearer"},
+        )
+        raise credentials_exception
+
+
+class JWTBearer(HTTPBearer):
+    def __init__(self, auto_error: bool = True):
+        super(JWTBearer, self).__init__(auto_error=auto_error)
+
+    async def __call__(self, request: Request):
+        credentials: HTTPAuthorizationCredentials = await super(JWTBearer, self).__call__(request)
+        if credentials:
+            if not credentials.scheme == "Bearer":
+                raise HTTPException(status_code=403, detail="Invalid authentication scheme.")
+            if not self.verify_jwt(credentials.credentials):
+                raise HTTPException(status_code=403, detail="Invalid token or expired token.")
+            return credentials.credentials
+        else:
+            raise HTTPException(status_code=403, detail="Invalid authorization code.")
+
+    def verify_jwt(self, token: str) -> bool:
+        is_valid: bool = False
+
+        try:
+            payload = jwt.decode(jwt=token,
+                                   verify=False,
+                                   algorithms=None,
+                                   verify_signature=False,
+                                   options={'verify_signature': False})
+
+            # payload = decodeJWT(jwtoken)
+        except:
+            payload = None
+        if payload:
+            is_valid = True
+        return is_valid

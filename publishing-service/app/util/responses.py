@@ -1,35 +1,72 @@
+from dataclasses import dataclass
+from typing import Dict, Union, Optional, Annotated
+
+from fastapi import File, UploadFile, Form
+from pydantic import BaseModel, ConfigDict, GetJsonSchemaHandler
+from dwc_validator.model import DFValidationReport
+from pydantic.json_schema import JsonSchemaValue
+
+from util.error_codes import ErrorCode
 
 
-class ErrorResponse:
-
-    def __init__(self, valid=False, error="", message=""):
-        self.valid = valid
-        self.error = error
-        self.message = message
+class ValidationRequest(BaseModel):
+    file: Annotated[UploadFile, File(description="A file read as UploadFile")]
 
 
-class PublishResponse:
-
-    def __init__(self, requestID: str, dataResourceUid: str, message: str, statusUrl: str, metadataUrl: str, metadataWsUrl: str):
-        self.requestID = requestID
-        self.dataResourceUid = dataResourceUid
-        self.message = message
-        self.statusUrl = statusUrl
-        self.metadataUrl = metadataUrl
-        self.metadataWsUrl = metadataWsUrl
+class ProcessRequest(BaseModel):
+    file: UploadFile = File(...)
+    dataResourceUid: str = None
 
 
-class ValidationResponse:
+@dataclass
+class PublishRequest:
+    name: str
+    licenceUrl: str
+    pubDescription: str
+    citation: Union[str, None]
+    rights: Union[str, None]
+    purpose: Union[str, None]
+    methodStepDescription:  Union[str, None]
+    qualityControlDescription: Union[str, None]
+    tempPath: str
+    requestID: str
+    dataResourceUid: Union[str, None]
 
-    def __init__(self, valid=False, datasetType="", breakdowns=None, fileName="", requestID="", tempPath="", metadata=None, hasEml=False, coreValidation=None, extensionValidations=None, mapImage=None):
-        self.valid = valid
-        self.datasetType = datasetType
-        self.breakdowns = breakdowns
-        self.fileName = fileName
-        self.requestID = requestID
-        self.tempPath = tempPath
-        self.metadata = metadata
-        self.hasEml = hasEml
-        self.coreValidation = coreValidation
-        self.extensionValidations = extensionValidations
-        self.mapImage = mapImage
+
+class ErrorResponse(BaseModel):
+    valid: bool = False
+    error: ErrorCode
+    message: str
+
+
+class PublishResponse(BaseModel):
+    requestID: str = ""
+    dataResourceUid: str = ""
+    message: str = ""
+    statusUrl: str = ""
+    metadataUrl: str = ""
+    metadataWsUrl: str = ""
+
+
+class ValidationResponse(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+    valid: bool = False
+    datasetType: str = ""
+    breakdowns: Dict = []
+    fileName: str = ""
+    requestID: str = ""
+    tempPath: Union[str, None] = None
+    metadata: Dict = {}
+    hasEml: bool = False
+    coreValidation: Union[any, None]
+    extensionValidations: Union[list[any], None]
+    mapImage: Union[str, None]
+
+
+class PublishStatus(BaseModel):
+    id: str
+    dataset_name: str
+    datasets: str
+    state: str
+    start_date: str
+    end_date: Union[str, None]

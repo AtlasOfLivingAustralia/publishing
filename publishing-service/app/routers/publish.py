@@ -1,20 +1,24 @@
 import json
+import os
 import uuid
 import logging
-from typing import Union, Optional
+from pathlib import Path
+from typing import Union
 import boto3
 import botocore
-import requests
 from botocore.exceptions import NoCredentialsError
+from dwc_validator.validate_dwca import validate_archive
+from dwca.darwincore.utils import qualname as qn
 from dwca.read import DwCAReader
-from fastapi import APIRouter, Request, Depends, Form
-from requests.auth import HTTPBasicAuth
+from fastapi import APIRouter, Depends, UploadFile, File
 from routers.licences import get_licence
 from util.airflow import start_ingest_dag
 from util.collectory import get_data_resource, update_conn_params, create_or_update_data_resource
 from util.config import get_app_config, AppConfig
-from util.auth import check_auth
-from util.responses import ErrorResponse, PublishResponse
+from util.auth import get_user, User, JWTBearer
+from util.eml import extract_metadata
+from util.error_codes import ErrorCode
+from util.responses import ErrorResponse, PublishResponse, ProcessRequest
 
 router = APIRouter()
 
@@ -22,209 +26,167 @@ router = APIRouter()
 @router.post(
     "/publish",
     tags=["publish"],
-    name="Publish a dataset",
-    description="Publish a pre-validated dataset. To use this service, users must first use the validate service and use the supplied requestID",
-    summary="Publish a dataset",
+    name="Validate and publish a dataset",
+    description="Validate and publish a dataset using the supplied darwin core archive",
+    summary="Validate and publish a dataset",
+    dependencies=[Depends(JWTBearer())],
+    response_model=Union[PublishResponse, ErrorResponse]
 )
+async def process(
+        file: UploadFile = File(...),
+        config: AppConfig = Depends(get_app_config),
+        user: User = Depends(get_user)
+    ) -> Union[PublishResponse, ErrorResponse]:
+    return await reprocess(file, None,  user, config)
+
 @router.post(
     "/publish/{dataResourceUid}",
-    name="Re-publish a dataset",
-    description="Re-publish a pre-validated dataset. To use this service, users must first use the validate service and use the supplied requestID",
-    tags=["publish"])
-async def publish(
-        request: Request,
-        name: Optional[str] = Form(None),
-        licenceUrl: Optional[str] = Form(None),
-        pubDescription: Optional[str] = Form(None),
-        citation: Optional[str] = Form(None),
-        rights: Optional[str] = Form(None),
-        purpose: Optional[str] = Form(None),
-        methodStepDescription: Optional[str] = Form(None),
-        qualityControlDescription: Optional[str] = Form(None),
-        tempPath: str = Form(),
-        requestID: str = Form(),
-        dataResourceUid: Union[str, None] = None,
-        config: AppConfig = Depends(get_app_config)):
+    name="Validate and publish a dataset",
+    description="Validate and republish a dataset using the supplied darwin core archive",
+    summary="Validate and republish a dataset",
+    tags=["publish"],
+    dependencies=[Depends(JWTBearer())],
+    response_model=Union[PublishResponse, ErrorResponse]
+)
+async def reprocess(
+        file: UploadFile = File(...),
+        dataResourceUid: str = None,
+        user: User = Depends(get_user),
+        config: AppConfig = Depends(get_app_config)) -> Union[PublishResponse, ErrorResponse]:
     """
-    Publish a dataset using the supplied darwin core archive
-    :param requestID:
-    :param tempPath:
-    :param qualityControlDescription:
-    :param methodStepDescription:
-    :param purpose:
-    :param rights:
-    :param citation:
-    :param pubDescription:
-    :param licenceUrl:
-    :param name:
+    Validate and publish a dataset using the supplied darwin core archive
+    :param user:
+    :param file:
     :param request:
     :param dataResourceUid:
     :param config:
     :return:
     """
-    # check user is authenticated
-    user = check_auth(request)
-    if not user:
-        return ErrorResponse(error='NOT_AUTHORIZED', message="Please provide authentication details")
-
     if user.is_publisher is False and user.is_admin is False:
-        return ErrorResponse(error='NOT_AUTHORIZED', message="You are not authorised to publish datasets")
+        return ErrorResponse(error=ErrorCode.NOT_AUTHORIZED, message='You are not authorised to publish datasets')
+
+    # generate request ID for status calls
+    request_id = str(uuid.uuid4())
+
+    # read the uploaded file
+    file2store = await file.read()
 
     # Check if the post request has the file part
-    if tempPath is None:
-        logging.info("Request missing tempPath.")
-        return ErrorResponse(error='DATA_FILE_MISSING_FOUND', message="Missing the tempPath file reference")
+    if not file2store:
+        logging.info("Validation request missing file")
+        return ErrorResponse(error=ErrorCode.MISSING_DATA_FILE, message='HTTP POST missing Missing file')
 
-    # check user is authorised to edit this datasets
-    if dataResourceUid:
-        # user needs to be creator or have ROLE_ADMIN privilege
-        data_resource = get_data_resource(dataResourceUid, config)
-        if data_resource is None:
-            return ErrorResponse(error='NOT_FOUND', message="The data resource UID is not recognised")
-
-        created_by_id = data_resource['createdByID']
-
-        if created_by_id != user.id and not user.is_admin:
-            return ErrorResponse(error='NOT_AUTHORIZED_FOR_DATA_RESOURCE', message="You are not authorised to update this resource")
-
-    request_id = None
-
-    # Check if the form fields are present in the request
-    if name is None or licenceUrl is None or pubDescription is None:
-        return ErrorResponse(error='MISSING_REQUIRED_FIELD', message="Missing required fields")
-
-    # check form submission fields
-    licence = get_licence(licenceUrl)
-    if licence is None:
-        return ErrorResponse(error='UNRECOGNISED_LICENCE', message="Unrecognised licence. Check /licences for a list of recognised licences")
-
-    # validate dwca archive
-    data_resource = {
-        "name": name,
-        "licenseType": licence.value['acronym'],
-        "licenseVersion": licence.value['version'],
-        "pubDescription": pubDescription,
-        "citation": citation,
-        "rights": rights,
-        "purpose": purpose,
-        "methodStepDescription": methodStepDescription,
-        "qualityControlDescription": qualityControlDescription,
-        "connectionParameters": json.dumps({
-            "termsForUniqueKey": ["occurrenceID"],
-            "protocol": "DwCA"
-        }),
-        "createdByID": user.id
-    }
-
+    # Save the file temporarily
+    temp_file_path = f'/tmp/temp-{request_id}.zip'
     try:
-        # update the registry
+        with open(temp_file_path, 'wb') as f:
+            f.write(file2store)
+    except Exception as e:
+        logging.error(f"Error with reading archive {e}", exc_info=True)
+        return ErrorResponse(error=ErrorCode.FILE_UPLOAD_ERROR, message=f'Problem with the submitted file upload')
+    finally:
+        file.file.close()
+
+    metadata = {}
+    try:
+        # validate the dataset
+        with DwCAReader(temp_file_path) as dwca:
+
+            # check the core type is supported
+            core_type = dwca.descriptor.core.type
+            logging.info("Core type: %s", core_type)
+            supported_core_types = {qn('Occurrence'), qn('Event')}
+
+            if core_type not in supported_core_types:
+                return ErrorResponse(error=ErrorCode.UNSUPPORTED_CORE_TYPE, message=f'The core type {core_type} is not supported')
+
+            # check metadata
+            if dwca.metadata:
+                metadata = extract_metadata(dwca.metadata)
+
+            # Check for mandatory fields
+            if 'name' not in metadata or metadata['name'] is None or 'licenceUrl' not in metadata or metadata['licenceUrl'] is None or 'pubDescription' not in metadata or metadata['pubDescription'] is None:
+                logging.info("Request missing mandatory fields")
+                return ErrorResponse(error=ErrorCode.MISSING_REQUIRED_FIELD,
+                                     message="Missing required fields. name, licenceUrl and description must be present in EML to pass validation")
+
+            # validate the licence
+            licence = get_licence(metadata['licenceUrl'])
+            if licence is None:
+                return ErrorResponse(error=ErrorCode.UNRECOGNISED_LICENCE, message=f"Unrecognised licence {metadata['licenceUrl']}. Check /licences for a list of recognised licences")
+
+            validate_report = validate_archive(dwca)
+            if not validate_report.valid:
+                os.remove(temp_file_path)
+                logging.info("Darwin core archive failed validation.")
+                return ErrorResponse(
+                    valid=False,
+                    error=ErrorCode.INVALID_ARCHIVE,
+                    message='The supplied Darwin Core Archive failed validation',
+                )
+
+        # check user is authorised to edit this datasets
+        if dataResourceUid:
+
+            # user needs to be creator or have ROLE_ADMIN privilege
+            data_resource = get_data_resource(dataResourceUid, config)
+            if data_resource is None:
+                return ErrorResponse(error=ErrorCode.DATA_RESOURCE_NOT_FOUND, message='The data resource UID is not recognised')
+
+            created_by_id = data_resource['createdByID']
+
+            if created_by_id != user.id and not user.is_admin:
+                return ErrorResponse(error=ErrorCode.NOT_AUTHORIZED_FOR_DATA_RESOURCE, message='You are not authorised to update this resource')
+
+        # validate dwca archive
+        data_resource = {
+            "name":  metadata['name'],
+            "licenseType": licence.value['acronym'],
+            "licenseVersion": licence.value['version'],
+            "pubDescription": metadata['pubDescription'],
+            "citation": metadata['citation'],
+            "rights": metadata['rights'],
+            "purpose": metadata['purpose'],
+            "methodStepDescription": metadata['methodStepDescription'],
+            "qualityControlDescription": metadata['qualityControlDescription'],
+            "connectionParameters": json.dumps({
+                "termsForUniqueKey": ["occurrenceID"],
+                "protocol": "DwCA"
+            }),
+            "createdByID": user.id
+        }
+
+        # register in the collectory
         data_resource_uid = create_or_update_data_resource(dataResourceUid, data_resource, user, config)
 
         if data_resource_uid:
-            logging.info("Copy from temp location to dwca-imports")
-            request_id = requestID
+            # upload to s3
+            logging.info("Uploading to S3 bucket...")
             s3 = boto3.client('s3')
-            # Copy the object
-            s3.copy_object(
-                Bucket=config.s3_bucket_name,
-                CopySource={'Bucket': config.s3_bucket_name, 'Key': f'file-uploads/{tempPath}'},
-                Key=f"dwca-imports/{data_resource_uid}/{data_resource_uid}.zip"
-            )
+            s3.upload_file(temp_file_path, config.s3_bucket_name,
+                           f"dwca-imports/{data_resource_uid}/{data_resource_uid}.zip")
+            os.remove(temp_file_path)  # Remove the temporary file
+            logging.info(
+                f'File uploaded successfully to S3! Details: Name={data_resource["name"]}')
+        else:
+            return ErrorResponse(error=ErrorCode.REGISTRY_ERROR, message='Problem updating dataset in the registry')
 
         # Update the connection parameters to include references to S3
         update_conn_params(data_resource_uid, config)
-        return start_ingest_dag(name, data_resource_uid, request_id, user, config)
+        return start_ingest_dag(metadata['name'], data_resource_uid, request_id, user, config)
 
     except botocore.exceptions.ClientError as ce:
+        if temp_file_path and Path(temp_file_path).is_file():
+            os.remove(temp_file_path)  # Remove the temporary file in case of upload failure
         logging.error("AWS credentials not available or expired", ce, exc_info=True)
-        return ErrorResponse(error='AWS_CRED_EXPIRED', message='AWS credentials not available or expired')
+        return ErrorResponse(error=ErrorCode.AWS_CRED_EXPIRED, message='AWS credentials not available or expired')
     except NoCredentialsError as ne:
+        if temp_file_path and Path(temp_file_path).is_file():
+            os.remove(temp_file_path)  # Remove the temporary file in case of upload failure
         logging.error("AWS credentials not available", ne, exc_info=True)
-        return ErrorResponse(error='AWS_NOT_AVAILABLE', message='AWS credentials not available')
+        return ErrorResponse(error=ErrorCode.AWS_NOT_AVAILABLE, message='AWS credentials not available')
     except Exception as e:
+        if temp_file_path and Path(temp_file_path).is_file():
+            os.remove(temp_file_path)  # Remove the temporary file in case of upload failure
         logging.error("Exception", e, exc_info=True)
-        return ErrorResponse(error='SYSTEM_ERROR', message=f'Error: {str(e)}')
-
-
-def _find_partial_match(dictionary, search_string):
-    for key in dictionary.keys():
-        if search_string in key:
-            return key
-    return None
-
-
-@router.delete("/publish/{dataResourceUid}",
-               name="Un-publish a dataset",
-               description="Un-publish a  dataset",
-               tags=["publish"])
-async def un_publish(request: Request, dataResourceUid: str, config: AppConfig = Depends(get_app_config)):
-    # check user is authenticated
-    user = check_auth(request)
-    if not user:
-        return ErrorResponse(error='NOT_AUTHORIZED', message='Please provide authentication details')
-
-    # check user is authorised to edit this datasets
-    if dataResourceUid:
-
-        # user needs to be creator or have ROLE_ADMIN privilege
-        data_resource = get_data_resource(dataResourceUid)
-        if data_resource is None:
-            return ErrorResponse(error='NOT_FOUND', message='The data resource UID is not recognised')
-
-        created_by_id = data_resource['createdByID']
-
-        if created_by_id != user.id and not user.is_admin:
-            return ErrorResponse(error='NOT_AUTHORIZED_FOR_DATA_RESOURCE', message='You are not authorised to update this resource')
-
-        endpoint = f'{config.airflow_api_base_url}/dags/Delete_dataset_dag/dagRuns'
-        headers = {
-            'Content-Type': 'application/json'
-        }
-
-        request_id = str(uuid.uuid4())
-
-        dag_run_data = {
-            "dag_run_id": request_id,
-            "note": f"Delete - {data_resource['name']}",
-            "conf": {
-                "userid": user.id,
-                "userEmail": user.email,
-                "userDisplayName": user.name,
-                "dataset_name": data_resource['name'],
-                "datasetIds": dataResourceUid,
-                "remove_records_in_solr": "true",
-                "remove_records_in_es": "false",
-                "delete_avro_files": "true",
-                "retain_dwca": "true",
-                "retain_uuid": "true"
-            }
-        }
-
-        airflow_response = requests.post(endpoint, json=dag_run_data, headers=headers,
-                                         auth=HTTPBasicAuth(config.airflow_username, config.airflow_password))
-
-        if airflow_response.status_code == 200:
-            # start the publishing
-            return PublishResponse(
-                requestID=request_id,
-                dataResourceUid=dataResourceUid,
-                message="Dataset delete request started",
-                statusUrl=f"/status/{request_id}",
-                metadataUrl=f"{config.collectory_lookup_url}/dataResource/{dataResourceUid}",
-                metadataWsUrl=f"{config.collectory_lookup_url}/ws/dataResource/{dataResourceUid}"
-            )
-        else:
-            logging.info(f"Failed to start DAG. Status code: {airflow_response.status_code}")
-            return ErrorResponse(error='AIRFLOW_ERROR', message=f'Unable to access airflow. Response code {airflow_response.status_code}')
-
-    else:
-        return ErrorResponse(error='INVALID_DATA_RESOURCE_UID', message='Invalid or empty data resource')
-
-
-def is_valid_dwca(zip_file_path):
-    try:
-        reader = DwCAReader(zip_file_path)
-    except Exception as e:
-        logging.error(f"Error with reading archive {e}", exc_info=True)
-        return False
-    return True
+        return ErrorResponse(error=ErrorCode.SYSTEM_ERROR, message=f'Error: {str(e)}')

@@ -28,21 +28,13 @@ export default function API() {
                 -H "Authorization: Bearer $(cat /tmp/jwt.txt)"
                 -F "file=@/tmp/my-darwin-core-archive.zip"`
 
-    const republish = `curl -X POST ${import.meta.env.VITE_APP_PUBLISH_URL}/publish/dr123
+    const re_publish = `curl -X POST ${import.meta.env.VITE_APP_PUBLISH_URL}/publish/dr123
                 -H "Authorization: Bearer $(cat /tmp/jwt.txt)"
                 -F "file=@/tmp/my-darwin-core-archive.zip"`
 
-    const unpublish = `curl -X DELETE ${import.meta.env.VITE_APP_PUBLISH_URL}/publish/dr123
+    const un_publish = `curl -X DELETE ${import.meta.env.VITE_APP_PUBLISH_URL}/publish/dr123
                 -H "Authorization: Bearer $(cat /tmp/jwt.txt)"`
 
-    const publishWithParams = `curl -X POST ${import.meta.env.VITE_APP_PUBLISH_URL}/publish
-                -H "Authorization: Bearer $(cat /tmp/jwt.txt)"
-                -F "name=My dataset name"
-                -F "description=My description of this dataset..."
-                -F "licenceUrl=https://creativecommons.org/licenses/by/4.0/"
-                -F "rights=My rights statement..."
-                -F "citation=Please cite this data as..."
-                -F "file=@/tmp/my-darwin-core-archive.zip"`;
 
     return <Grid mb="md">
         <Grid.Col xs={1} sm={2}>
@@ -77,7 +69,6 @@ export default function API() {
                 <Text>
                    For testing, you can get your JWT by clicking the button below. Save this to a file
                     e.g. <Code>/tmp/jwt.txt</Code>
-
                 </Text>
                 <Text>
                     Note: these JWTs expire after 30 minutes.
@@ -104,32 +95,26 @@ export default function API() {
             <Space h="xl"/>
             <Title order={3} size="h4">DwCA Validation</Title>
             <Space h="lg"/>
-            <Text>You can validate a DwCA like so:</Text>
+            <Text>You can validate a DwCA like so (this does not publish the archive):</Text>
             <Code maw={800} block><Prism language="bash">{validate}</Prism></Code>
 
             <Space h="xl"/>
-            <Title order={3} size="h4">DwCA Publishing</Title>
+            <Title order={3} size="h4">DwCA Validate and Publishing</Title>
             <Space h="lg"/>
-            <Text>You can publish a DwCA like so:</Text>
+            <Text>You can validate and publish a DwCA like so:</Text>
             <Code maw={800} block><Prism language="bash">{publish}</Prism></Code>
-
-            <Space h="xl"/>
-            <Title order={3} size="h4">DwCA Publishing with additional parameters</Title>
-            <Space h="lg"/>
-            <Text>You can publish a DwCA and provide some metadata properties like so:</Text>
-            <Code maw={800} block><Prism language="bash">{publishWithParams}</Prism></Code>
 
             <Space h="xl"/>
             <Title order={3} size="h4">DwCA Re-publishing</Title>
             <Space h="lg"/>
             <Text>You can republish a DwCA using the data resource ID e.g. dr123 like so:</Text>
-            <Code maw={800} block><Prism language="bash">{republish}</Prism></Code>
+            <Code maw={800} block><Prism language="bash">{re_publish}</Prism></Code>
 
             <Space h="xl"/>
             <Title order={3} size="h4">Un-publishing</Title>
             <Space h="lg"/>
             <Text>You can un-publish (delete) a DwCA using the data resource ID e.g. dr123 like so:</Text>
-            <Code maw={800} block><Prism language="bash">{unpublish}</Prism></Code>
+            <Code maw={800} block><Prism language="bash">{un_publish}</Prism></Code>
 
         </Grid.Col>
     </Grid>

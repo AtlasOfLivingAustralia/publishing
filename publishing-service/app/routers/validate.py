@@ -1,14 +1,16 @@
 import logging
 import uuid
 import os
+from typing import Union
+from fastapi.encoders import jsonable_encoder
 import boto3
 from pathlib import Path
 from dwca.darwincore.utils import qualname as qn
-from fastapi import Request, Depends
+from fastapi import Depends
 from dwc_validator.exceptions import CoordinatesException
 from dwca.exceptions import BadlyFormedMetaXml
-from fastapi import APIRouter, File, UploadFile
-from util.auth import check_auth
+from fastapi import APIRouter, File, UploadFile, Form
+from util.auth import get_user, User, JWTBearer
 from dwca.read import DwCAReader
 from dwc_validator.validate_dwca import validate_archive
 from util.config import AppConfig, get_app_config
@@ -23,20 +25,23 @@ router = APIRouter()
              tags=["validate"],
              name="Validate a dataset",
              description="Validate a dataset using the supplied darwin core archive",
-             summary="Validate a dataset")
-async def validate(request: Request, file: UploadFile = File(...), config: AppConfig = Depends(get_app_config)):
+             summary="Validate a dataset",
+             dependencies=[Depends(JWTBearer())],
+             response_model=Union[ValidationResponse, ErrorResponse]
+ )
+async def validate(storeTemp: bool = Form(None), file: UploadFile = File(None, media_type="application/zip"),
+                   config: AppConfig = Depends(get_app_config),
+                   user: User = Depends(get_user)) -> Union[ValidationResponse, ErrorResponse]:
     """
     Validate a dataset using the supplied darwin core archive
+    :param storeTemp:
+    :param store_temp: Store the file for later publishing if valid
+    :param user:
     :param config:
-    :param request:
     :param file:
     :return:
     """
     logging.info("Validation request received")
-    user = check_auth(request)
-    if not user:
-        return ErrorResponse(error='NOT_AUTHORISED', message='Please provide authentication details')
-
     request_id = str(uuid.uuid4())
     file2store = await file.read()
 
@@ -83,8 +88,8 @@ async def validate(request: Request, file: UploadFile = File(...), config: AppCo
                     breakdowns=validate_report.breakdowns,
                     fileName=file.filename,
                     requestID=request_id,
-                    coreValidation=validate_report.core,
-                    extensionValidations=validate_report.extensions,
+                    coreValidation=jsonable_encoder(validate_report.core),
+                    extensionValidations=jsonable_encoder(validate_report.extensions),
                     mapImage=map_img
                 )
 
@@ -95,12 +100,14 @@ async def validate(request: Request, file: UploadFile = File(...), config: AppCo
                 metadata = extract_metadata(dwca.metadata)
 
             # save to s3
-            logging.info("Uploading to S3 bucket...")
-            s3 = boto3.client('s3')
-            s3_temp_path = f'{user.id}/{request_id}.zip'
-            s3.upload_file(temp_file_path, config.s3_bucket_name, f"file-uploads/{user.id}/{request_id}.zip")
-            os.remove(temp_file_path)  # Remove the temporary file
-            logging.info("Uploaded to S3 bucket.")
+            s3_temp_path = None
+            if storeTemp:
+                logging.info("Uploading to S3 bucket...")
+                s3 = boto3.client('s3')
+                s3_temp_path = f'{user.id}/{request_id}.zip'
+                s3.upload_file(temp_file_path, config.s3_bucket_name, f"file-uploads/{user.id}/{request_id}.zip")
+                os.remove(temp_file_path)  # Remove the temporary file
+                logging.info("Uploaded to S3 bucket.")
 
             return ValidationResponse(
                 valid=True,
@@ -111,8 +118,8 @@ async def validate(request: Request, file: UploadFile = File(...), config: AppCo
                 tempPath=s3_temp_path,
                 metadata=metadata,
                 hasEml=has_eml,
-                coreValidation=validate_report.core,
-                extensionValidations=validate_report.extensions,
+                coreValidation=jsonable_encoder(validate_report.core),
+                extensionValidations=jsonable_encoder(validate_report.extensions),
                 mapImage=map_img
             )
 
@@ -127,28 +134,28 @@ async def validate(request: Request, file: UploadFile = File(...), config: AppCo
         logging.error(e, exc_info=True)
         if temp_file_path and Path(temp_file_path).is_file():
             os.remove(temp_file_path)
-        return ErrorResponse(error='BADLY_FORMED_COORDINATES', message= e.args[0])
+        return ErrorResponse(error='BADLY_FORMED_COORDINATES', message=e.args[0])
     except ValueError as e:
         logging.error(f"Error with reading archive {e}", exc_info=True)
         logging.error(e, exc_info=True)
         if temp_file_path and Path(temp_file_path).is_file():
             os.remove(temp_file_path)
-        return ErrorResponse(error='BADLY_FORMED_META_XML', message= e.args[0])
+        return ErrorResponse(error='BADLY_FORMED_META_XML', message=e.args[0])
     except AttributeError as e:
         logging.error(f"Error with reading archive {e}", exc_info=True)
         logging.error(e, exc_info=True)
         if temp_file_path and Path(temp_file_path).is_file():
             os.remove(temp_file_path)
-        return ErrorResponse(error='BADLY_FORMED_META_XML', message= e.args[0])
+        return ErrorResponse(error='BADLY_FORMED_META_XML', message=e.args[0])
     except BadlyFormedMetaXml as e:
         logging.error(f"Error with validate {e}", exc_info=True)
         logging.error(e, exc_info=True)
         if temp_file_path and Path(temp_file_path).is_file():
             os.remove(temp_file_path)
-        return ErrorResponse(error='BADLY_FORMED_META_XML', message= e.args[0])
+        return ErrorResponse(error='BADLY_FORMED_META_XML', message=e.args[0])
     except Exception as e:
         logging.error(f"Error with validate {e}", exc_info=True)
         logging.error(e, exc_info=True)
         if temp_file_path and Path(temp_file_path).is_file():
             os.remove(temp_file_path)
-        return ErrorResponse(error='INVALID_ARCHIVE', message= e.args[0])
+        return ErrorResponse(error='INVALID_ARCHIVE', message=e.args[0])
