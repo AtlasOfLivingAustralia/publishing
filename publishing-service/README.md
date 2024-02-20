@@ -10,7 +10,7 @@ cd app
 uvicorn main:app --reload
 ```
 
-## Local dev setup
+## Local development setup
 
 ```bash
 
@@ -34,3 +34,18 @@ pip install git+https://github.com/djtfmartin/dwc-dataframe-validator.git
 pip install uvicorn
 pytest --cov
 ```
+
+## REST
+
+The Swagger UI for REST services are available at `http://localhost:5000`.
+
+## Docker hub
+
+The docker images for publishing-service are available on [docker hub](https://hub.docker.com/r/atlasoflivingaustralia/publishing-service). 
+Commits to this `develop` branch will result in a new image being built and pushed to the `latest` tag on docker hub.
+
+## Helm charts
+
+The helm charts for publishing-service are available in the 
+[helm-charts](https://github.com/AtlasOfLivingAustralia/helm-charts) repository.
+
