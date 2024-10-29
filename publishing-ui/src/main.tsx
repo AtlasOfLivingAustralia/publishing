@@ -9,7 +9,7 @@ import messages_en from "./translations/en.json";
 import {IntlProvider} from "react-intl";
 import {setContext} from "@apollo/client/link/context";
 import {Notifications} from "@mantine/notifications";
-import { AuthProvider } from "react-oidc-context";
+import { hasAuthParams, AuthProvider } from "react-oidc-context";
 import {User, WebStorageStateStore} from "oidc-client-ts";
 
 const httpLink = createHttpLink({
@@ -22,7 +22,7 @@ const authLink = setContext((_, { headers }) => {
     if (oidcStorage) {
         const user = User.fromStorageString(oidcStorage);
         if (!user.expired){
-            const token = user?.access_token;
+            const token = user?.id_token || user?.access_token;
             return {
                 headers: {
                     ...headers,
@@ -59,8 +59,7 @@ const oidcConfig = {
     post_logout_redirect_uri: import.meta.env.VITE_OIDC_REDIRECT_URL,
     userStore: new WebStorageStateStore({ store: window.localStorage }),
     onSigninCallback: () => {
-        const { search } = window.location;
-        if (search.includes('code=') && search.includes('state=')) {
+        if (hasAuthParams(window.location)) {
             const params = new URLSearchParams(window.location.search);
             params.delete('code');
             params.delete('state');
