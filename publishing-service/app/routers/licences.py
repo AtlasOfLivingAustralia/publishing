@@ -27,7 +27,7 @@ LICENSE_MAP: Dict[str, dict] = {license_url: license_info.value for license_url,
 
 def get_licence(licenceUrl) -> Union[LicenseInfo, None]:
     for licence in LicenseInfo:
-        if licenceUrl in licence.value['url']:
+        if licenceUrl.replace("http://", "https://") in licence.value['url']:
             return licence
     return None
 

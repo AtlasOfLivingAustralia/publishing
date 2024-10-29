@@ -157,8 +157,8 @@ export default function Publish() {
             const user = User.fromStorageString(oidcStorage);
             let token = null;
             if (!user.expired) {
-                token = user?.access_token;
-                const roles = (user?.profile?.role || []) as string[];
+                token = user?.id_token || user?.access_token;
+                const roles = (user?.profile?.role || user?.profile && user?.profile['ala:role'] || []) as string[];
                 const isAdmin = roles.includes(import.meta.env.VITE_ROLE_ADMIN);
                 const isPublisher = roles.includes(import.meta.env.VITE_ROLE_PUBLISHER);
                 if (!isAdmin && !isPublisher){
@@ -275,7 +275,7 @@ export default function Publish() {
             const user = User.fromStorageString(oidcStorage);
             let token = null;
             if (!user.expired) {
-                token = user?.access_token;
+                token = user?.id_token || user?.access_token;
                 axios.post(import.meta.env.VITE_APP_PUBLISH_URL + "/validate", formData, {
                     onUploadProgress: (progressEvent) => {
                         const { loaded, total } = progressEvent;
@@ -380,8 +380,6 @@ export default function Publish() {
                 </Stepper.Step>
                 <Stepper.Step label="Published" description="Dataset available online">
                 </Stepper.Step>
-                <Stepper.Completed>
-                </Stepper.Completed>
             </Stepper>
 
             { uploading && <Group position="center" spacing="xl" style={{ minHeight: rem(120), pointerEvents: 'none',  border: '1px dashed #ced4da' }}>

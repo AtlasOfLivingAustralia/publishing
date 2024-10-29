@@ -19,6 +19,12 @@ def get_user(request: Request) -> User:
     :param request:
     :return:
     """
+    def get_any(dic, keys, default=""):
+        for k in keys:
+            if k in dic:
+                return dic[k]
+        return default
+
     auth_header = request.headers.get("Authorization")
 
     if not auth_header:
@@ -36,10 +42,11 @@ def get_user(request: Request) -> User:
                                    verify_signature=False,
                                    options={'verify_signature': False})
 
-        userid = decoded_token['userid']
-        user_email = decoded_token['email']
-        user_display_name = decoded_token['name']
-        roles = decoded_token['role']
+        userid = get_any(decoded_token, ['userid', 'custom:userid'])
+        user_email = get_any(decoded_token, ['email'])
+        user_name = [get_any(decoded_token, ['name', 'given_name']), get_any(decoded_token, ['family_name'])]
+        user_display_name = " ".join(x for x in user_name if x)
+        roles = get_any(decoded_token, ['role', 'ala:role'])
         is_admin = 'ROLE_ADMIN' in roles
         is_publisher = 'ROLE_DATA_PUBLISHER' in roles
         return User(userid, user_email, user_display_name, is_admin, is_publisher)

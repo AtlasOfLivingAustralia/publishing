@@ -15,7 +15,7 @@ export default function API() {
         if (oidcStorage) {
             const user = User.fromStorageString(oidcStorage);
             if (!user.expired) {
-                setToken(user?.access_token);
+                setToken(user?.id_token || user?.access_token);
             }
         }
     }, []);

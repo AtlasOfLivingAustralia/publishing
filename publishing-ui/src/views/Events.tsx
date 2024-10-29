@@ -34,7 +34,11 @@ export default function Events() {
             })
             .then(data => {
                 setLoading(false);
-                setData(data);
+                if (data.valid) {
+                    setData(data);
+                } else {
+                    console.log('Error loading events: %s %s', data.error, data.message)
+                }
             })
             .catch(error => {
                 setLoading(false);
