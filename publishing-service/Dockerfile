@@ -1,9 +1,11 @@
 # Use an official Python runtime as a parent image
-FROM python:3.8-slim
+FROM python:3.12-slim
 
 # Install Git
 RUN apt-get update && \
     apt-get install -y git
+
+RUN apt-get install -y gdal-bin libgdal-dev g++
 
 # Set the working directory in the container
 WORKDIR /app
@@ -14,7 +16,7 @@ COPY . /app
 # Install the required packages
 RUN pip install --upgrade pip
 RUN pip install git+https://github.com/djtfmartin/python-dwca-reader.git
-RUN pip install git+https://github.com/djtfmartin/dwc-dataframe-validator.git
+RUN pip install git+https://github.com/AtlasOfLivingAustralia/dwc-dataframe-validator.git
 RUN pip install -r requirements.txt
 RUN pip install uvicorn
 

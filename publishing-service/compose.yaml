@@ -1,0 +1,11 @@
+version: '1'
+services:
+  publishing-service:
+    image: publishing-service:latest
+    ports:
+      - 8000:5000
+    environment:
+      - AWS_PROFILE=${AWS_PROFILE}
+    volumes:
+      - ~/data/publishing-service/config/.env:/data/publishing-service/config/.env
+      - ~/.aws/:/root/.aws
