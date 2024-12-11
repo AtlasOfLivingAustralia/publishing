@@ -595,7 +595,7 @@ export default function Publish() {
                                     label="Description"
                                     placeholder="Add a description..."
                                     // disabled={ingesting}
-                                    readOnly={uploaded.hasEml}
+                                    readOnly={uploaded.hasEml && uploaded.metadata.pubDescription}
                                     {...uploadForm.getInputProps("pubDescription")}
                                 />
                                 <Space h="md" />

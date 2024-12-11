@@ -64,8 +64,8 @@ export default function App() {
     if (auth.isAuthenticated && auth.user && !currentUser) {
         // set the current user
         const user = auth.user;
-        const roles = (user?.profile?.role || []) as string[];
-        const userId = user?.profile?.userid as string || '';
+        const roles = (user?.profile?.role || user?.profile["ala:role"] || []) as string[];
+        const userId = user?.profile?.userid as string || user?.profile["cognito:username"] as string || '';
         setCurrentUser({
             user: auth.user,
             userId: userId,
