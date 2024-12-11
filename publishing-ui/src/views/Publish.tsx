@@ -556,7 +556,7 @@ export default function Publish() {
 
                                     <FieldsSupplied column_counts={uploaded?.coreValidation.column_counts} occcolumn_counts={occurrenceExtension?.column_counts} fieldNames={['decimalLatitude', 'decimalLongitude']} label="Coordinates" totalRecords={uploaded.coreValidation.record_count} skipWarning={false}/>
 
-                                    <FieldsNotSupplied column_counts={uploaded?.coreValidation.column_counts} occcolumn_counts={occurrenceExtension?.column_counts}fieldNames={['scientificName', 'genus', 'family', 'order', 'class', 'phylum', 'kingdom']} label="No taxonomic information" totalRecords={uploaded.coreValidation.record_count}/>
+                                    <FieldsNotSupplied column_counts={uploaded?.coreValidation.column_counts} occcolumn_counts={occurrenceExtension?.column_counts} fieldNames={['scientificName', 'genus', 'family', 'order', 'class', 'phylum', 'kingdom']} label="No taxonomic information" totalRecords={uploaded.coreValidation.record_count}/>
                                     <FieldsNotSupplied column_counts={uploaded?.coreValidation.column_counts} occcolumn_counts={occurrenceExtension?.column_counts} fieldNames={['eventDate', 'month', 'year']} label="No date information" totalRecords={uploaded.coreValidation.record_count}/>
 
                                     <FieldSupplied column_counts={uploaded?.coreValidation.column_counts} occcolumn_counts={occurrenceExtension?.column_counts} fieldName="eventDate" label="Event date" totalRecords={uploaded.coreValidation.record_count} skipWarning={true}/>
